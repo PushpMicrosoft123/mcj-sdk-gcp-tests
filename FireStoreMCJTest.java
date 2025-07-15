@@ -14,14 +14,13 @@ import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sf.mcj.clients.FireStoreGCPNativeClient;
 import sf.mcj.clients.FireStoreMCJClient;
+import sf.mcj.main.TestData.CompositeProduct;
 import sf.mcj.main.TestData.Item;
 import sf.mcj.main.TestData.Matrix;
 import sf.mcj.main.TestData.Product;
 import sf.mcj.main.TestData.ProductDetails;
 import sf.mcj.main.TestData.SuperProduct;
-import sf.mcj.tests.firestore.FireStoreGCPNativeTest;
 
 public class FireStoreMCJTest {
 
@@ -30,13 +29,11 @@ public class FireStoreMCJTest {
   private static final Logger logger = LoggerFactory.getLogger(FireStoreMCJClient.class);
 
   public static void main(String[] args) {
-    logger.info("****** Please recreate the collection Products before running the test cases*****");
+    //****** Please recreate the collection Products before running the test cases*****
 
     if(!initializeDocStoreClient()) {
       logger.error("Firestore initialization failed. Exiting...");
     }
-
-    logger.info("---- Clean up the Firestore collection-----");
 
     logger.info("---- Running Firestore Tests-----");
 
@@ -73,6 +70,14 @@ public class FireStoreMCJTest {
     FS_IT_QUERY_04();
 
     FS_IT_QUERY_06();
+
+    FS_IT_ATOMIC_TRANSACT_01();
+
+    FS_IT_ATOMIC_TRANSACT_02();
+
+    FS_IT_ATOMIC_TRANSACT_03();
+
+    FS_IT_ATOMIC_TRANSACT_04();
 
     closeConnection();
   }
@@ -674,6 +679,161 @@ public class FireStoreMCJTest {
 
       logger.info(String.format("[%s] Data integrity verified. Test PASSED!", scenario));
 
+    } catch (Exception e) {
+      logger.error(String.format("[%s] Error during test: %s", scenario, e.getMessage()));
+      e.printStackTrace();
+      logger.error(String.format("[%s] Test FAILED.", scenario));
+    }
+  }
+
+  private static void FS_IT_ATOMIC_TRANSACT_01() {
+    String scenario = "FS_IT_ATOMIC_TRANSACT_01";
+
+    ProductDetails details = new ProductDetails("1.0.2", "Acme Corp", new java.util.Date().toString());
+    CompositeProduct createTestData01 = CompositeProduct.builder().id("atomicCompPutGet001").productName("Deluxe Widget").details(details).price(29.99).isActive(true).subProducts(Map.of("product1", "mobile")).build();
+
+    CompositeProduct createTestData02 = CompositeProduct.builder().id("atomicCompPutGet002").productName("Deluxe Widget").details(details).price(29.99).isActive(true).subProducts(Map.of("product1", "mobile", "product2", "laptop")).build();
+
+    CompositeProduct updateTestData01 = CompositeProduct.builder().id("atomicCompPutGet001").productName("Deluxe Widget").details(details).price(59.99).isActive(true).subProducts(Map.of("product1", "laptop")).build();
+
+    CompositeProduct updateTestData02 = CompositeProduct.builder().id("atomicCompPutGet002").productName("Deluxe Widget").details(details).price(69.99).isActive(true).subProducts(Map.of("product1", "mobile", "product2", "tablet")).build();
+
+    try {
+      docStoreClient.create(new Document(createTestData01));
+      docStoreClient.create(new Document(createTestData02));
+      logger.info(String.format("[%s] Document created successfully!", scenario));
+
+      logger.info(String.format("[%s] Running atomic transaction...", scenario));
+      Product retrievedData01 = Product.builder().id(createTestData01.getId()).build();
+      Product retrievedData02 = Product.builder().id(createTestData02.getId()).build();
+      docStoreClient.getActions()
+          .put(new Document(updateTestData01))
+          .put(new Document(updateTestData02))
+          .get(new Document(retrievedData01))
+          .get(new Document(retrievedData02))
+          .enableAtomicWrites().run();
+
+      // Basic verification
+      if (updateTestData01.equals(retrievedData01) && updateTestData02.equals(retrievedData02)) {
+        logger.info(String.format("[%s] Data integrity verified. Test PASSED!", scenario));
+      } else {
+        logger.info(String.format("[%s] Data mismatch after retrieval. Test FAILED.", scenario));
+      }
+    } catch (Exception e) {
+      logger.error(String.format("[%s] Error during test: %s", scenario, e.getMessage()));
+      e.printStackTrace();
+      logger.error(String.format("[%s] Test FAILED.", scenario));
+    }
+  }
+
+  private static void FS_IT_ATOMIC_TRANSACT_02() {
+    String scenario = "FS_IT_ATOMIC_TRANSACT_02";
+
+    Map<String, Object> features = new HashMap<>();
+    for (int i = 0; i < 10000; i++) { // ~200KB (10000 entries * (key_size + value_size) )
+      features.put("Feature " + i + ": feature " + UUID.randomUUID().toString(), i + 1);
+    }
+
+    Map<String, Integer> dimensions = new HashMap<>();
+    for (int i = 0; i < 10000; i++) { // ~200KB (10000 entries * (key_size + value_size) )
+      dimensions.put("Dimension " + i + ": feature " + UUID.randomUUID().toString(), i + 1);
+    }
+
+    Item testData = new Item("atomicMaxDocPutGet001", Arrays.asList("electronics", "gadget", "sale"), null, Arrays.asList(4, 5, 3, 5), null);
+    Item updateTestData = new Item("atomicMaxDocPutGet001", Arrays.asList("electronics", "gadget", "sale"), features, Arrays.asList(4, 5, 3, 5), dimensions);
+
+    try {
+      docStoreClient.create(new Document(testData));
+      logger.info(String.format("[%s] Document created successfully!", scenario));
+
+      logger.info(String.format("[%s] Running atomic transaction (expected to be failed)...", scenario));
+      Product retrievedData01 = Product.builder().id(testData.getId()).build();
+      docStoreClient.getActions()
+          .put(new Document(updateTestData))
+          .get(new Document(retrievedData01))
+          .enableAtomicWrites().run();
+
+      // Basic verification
+      if (testData.equals(retrievedData01)) {
+        logger.info(String.format("[%s] Data integrity verified. Test PASSED!", scenario));
+      } else {
+        logger.info(String.format("[%s] Data mismatch after retrieval. Test FAILED.", scenario));
+      }
+    } catch (InvalidArgumentException e) {
+      logger.info(String.format("[%s] Exception verified. Test PASSED!", scenario));
+    }
+    catch (Exception e) {
+      logger.error(String.format("[%s] Error during test: %s", scenario, e.getMessage()));
+      e.printStackTrace();
+      logger.error(String.format("[%s] Test FAILED.", scenario));
+    }
+  }
+
+  private static void FS_IT_ATOMIC_TRANSACT_03() {
+    String scenario = "FS_IT_ATOMIC_TRANSACT_03";
+
+    try {
+      docStoreClient.getActions()
+          .enableAtomicWrites().run();
+      logger.info(String.format("[%s] Operation verified. Test PASSED!", scenario));
+
+    } catch (Exception e) {
+      logger.error(String.format("[%s] Error during test: %s", scenario, e.getMessage()));
+      e.printStackTrace();
+      logger.error(String.format("[%s] Test FAILED.", scenario));
+    }
+  }
+
+  private static void FS_IT_ATOMIC_TRANSACT_04() {
+    String scenario = "FS_IT_ATOMIC_TRANSACT_04";
+
+    ProductDetails details = new ProductDetails("1.0.2", "Acme Corp", new java.util.Date().toString());
+    Product createTestData01 = Product.builder().id("atomicMultiplePutGet001").productName("Deluxe Widget001").details(details).price(29.99).isActive(true).build();
+
+    Product createTestData02 = Product.builder().id("atomicMultiplePutGet002").productName("Deluxe Widget002").details(details).price(29.99).isActive(true).build();
+
+    Product createTestData03 = Product.builder().id("atomicMultiplePutGet003").productName("Deluxe Widget003").details(details).price(59.99).isActive(true).build();
+
+    Product createTestData04 = Product.builder().id("atomicMultiplePutGet004").productName("Deluxe Widget004").details(details).price(69.99).isActive(true).build();
+
+    Product updateTestData01 = Product.builder().id("atomicMultiplePutGet001").productName("Deluxe Widget003").details(details).price(59.99).isActive(true).build();
+
+    Product updateTestData02 = Product.builder().id("atomicMultiplePutGet002").productName("Deluxe Widget004").details(details).price(69.99).isActive(true).build();
+
+    try {
+      docStoreClient.create(new Document(createTestData01));
+      docStoreClient.create(new Document(createTestData02));
+      docStoreClient.create(new Document(createTestData03));
+      docStoreClient.create(new Document(createTestData04));
+      logger.info(String.format("[%s] Document created successfully!", scenario));
+
+      logger.info(String.format("[%s] Running atomic transaction...", scenario));
+      Product retrievedData01 = Product.builder().id(createTestData01.getId()).build();
+      Product retrievedData02 = Product.builder().id(createTestData02.getId()).build();
+      Product retrievedData03 = Product.builder().id(createTestData03.getId()).build();
+      Product retrievedData04 = Product.builder().id(createTestData04.getId()).build();
+
+      var actions = docStoreClient.getActions()
+          .get(new Document(retrievedData01))
+          .get(new Document(retrievedData02))
+          .get(new Document(retrievedData03))
+          .get(new Document(retrievedData04));
+
+      Product updateRetrievedData01 = Product.builder().id(retrievedData01.getId()).productName(retrievedData03.getProductName()).price(retrievedData03.getPrice()).isActive(retrievedData03.isActive()).details(retrievedData03.getDetails()).build();
+      Product updateRetrievedData02 = Product.builder().id(retrievedData02.getId()).productName(retrievedData04.getProductName()).price(retrievedData04.getPrice()).isActive(retrievedData04.isActive()).details(retrievedData04.getDetails()).build();
+
+      actions.put(new Document(updateRetrievedData01)).put(new Document(updateRetrievedData02));
+
+      actions.get(new Document(updateRetrievedData01)).get(new Document(updateRetrievedData02));
+
+      actions.enableAtomicWrites().run();
+
+      // Basic verification
+      if (updateTestData01.equals(retrievedData01) && updateTestData02.equals(retrievedData02)) {
+        logger.info(String.format("[%s] Data integrity verified. Test PASSED!", scenario));
+      } else {
+        logger.info(String.format("[%s] Data mismatch after retrieval. Test FAILED.", scenario));
+      }
     } catch (Exception e) {
       logger.error(String.format("[%s] Error during test: %s", scenario, e.getMessage()));
       e.printStackTrace();
