@@ -24,13 +24,9 @@ public class Item {
   public boolean equals(Object o) {
     // Check if the objects are the same instance
     if (this == o) return true;
-    // Check if the other object is null or not of the same class
     if (o == null || getClass() != o.getClass()) return false;
-    // Cast the object to Item
     Item item = (Item) o;
-    // Use Objects.equals for all reference types, including List and Map.
-    // Objects.equals handles nulls gracefully and calls the respective equals methods
-    // for collections and maps, providing a deep comparison.
+
     return Objects.equals(id, item.id) &&
         Objects.equals(tags, item.tags) &&
         Objects.equals(features, item.features) &&
