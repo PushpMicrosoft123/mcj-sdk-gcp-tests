@@ -19,7 +19,7 @@ public class CompositeProduct extends Product {
       // 1. Check if the objects are the same instance
       if (this == o) return true;
       if (o == null || getClass() != o.getClass()) return false;
-      
+
       CompositeProduct that = (CompositeProduct) o;
 
       if (!super.equals(o)) return false;

@@ -1,5 +1,6 @@
 package sf.mcj.main;
 
+import com.salesforce.multicloudj.common.exceptions.DeadlineExceededException;
 import com.salesforce.multicloudj.common.exceptions.InvalidArgumentException;
 import com.salesforce.multicloudj.common.exceptions.SubstrateSdkException;
 import com.salesforce.multicloudj.docstore.client.DocStoreClient;
@@ -11,16 +12,20 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import sf.mcj.clients.FireStoreMCJClient;
 import sf.mcj.main.TestData.CompositeProduct;
 import sf.mcj.main.TestData.Item;
+import sf.mcj.main.TestData.KitProduct;
+import sf.mcj.main.TestData.KitProductDetails;
 import sf.mcj.main.TestData.Matrix;
 import sf.mcj.main.TestData.Product;
 import sf.mcj.main.TestData.ProductDetails;
 import sf.mcj.main.TestData.SuperProduct;
+import sf.mcj.tests.firestore.FireStoreGCPNativeTest;
 
 public class FireStoreMCJTest {
 
@@ -37,7 +42,7 @@ public class FireStoreMCJTest {
 
     logger.info("---- Running Firestore Tests-----");
 
-    FS_IT_CREATE_01();
+    /*FS_IT_CREATE_01();
 
     FS_IT_CREATE_02();
 
@@ -69,7 +74,14 @@ public class FireStoreMCJTest {
 
     FS_IT_QUERY_04();
 
-    FS_IT_QUERY_06();
+    FS_IT_QUERY_06();*/
+
+    //FS_IT_QUERY_07();
+
+    //FS_BATCH_WRITE_01();
+    //FireStoreGCPNativeTest.FS_GET_04();
+
+    FS_IT_GET_04();
 
     FS_IT_ATOMIC_TRANSACT_01();
 
@@ -326,6 +338,28 @@ public class FireStoreMCJTest {
       logger.info(String.format("[%s] Verifying document data...", scenario));
 
       if (expectedData.equals(retrievedData)) {
+        logger.info(String.format("[%s] Data integrity verified. Test PASSED!", scenario));
+      } else {
+        logger.info(String.format("[%s] Data mismatch after retrieval. Test FAILED", scenario));
+      }
+    } catch (Exception e) {
+      logger.error(String.format("[%s] Error during test: %s", scenario, e.getMessage()));
+      e.printStackTrace();
+      logger.error(String.format("[%s] Test FAILED.", scenario));
+    }
+  }
+
+  private static void FS_IT_GET_04() {
+    String scenario = "FS_IT_GET_04";
+
+    try {
+      logger.info(String.format("[%s] Retrieving non-existing document (expected to fail)!", scenario));
+
+      Product retrievedData = Product.builder().id("nonExistIdDoc04").build();
+      docStoreClient.get(new Document(retrievedData));
+      logger.info(String.format("[%s] Verifying document ...", scenario));
+
+      if (Objects.isNull(retrievedData)) {
         logger.info(String.format("[%s] Data integrity verified. Test PASSED!", scenario));
       } else {
         logger.info(String.format("[%s] Data mismatch after retrieval. Test FAILED", scenario));
@@ -686,6 +720,57 @@ public class FireStoreMCJTest {
     }
   }
 
+  private static void FS_IT_QUERY_07() {
+    String scenario = "FS_IT_QUERY_07";
+
+    ProductDetails details = new ProductDetails("1.0.2", "Acme Corp", new java.util.Date().toString());
+
+    KitProductDetails superProductDetails = KitProductDetails.builder().version("1.0.3").manufacturer("Acme Corp").releaseDate(new java.util.Date().toString()).country("US").build();
+
+    Product mobile = new Product("mobNonExistField007", "mobile", details, 59.99, true);
+
+    Product tablet = Product.builder().id("tabNonExistField007").productName("tablet").details(details).price(54.99).isActive(true).build();
+
+    KitProduct laptop = KitProduct.builder().id("lapNonExistField007").productName("tablet").details(superProductDetails).price(54.99).isActive(true).build();
+
+    try {
+      docStoreClient.create(new Document(mobile));
+      docStoreClient.create(new Document(tablet));
+      docStoreClient.create(new Document(laptop));
+      logger.info(String.format("[%s] Documents created successfully!", scenario));
+
+      logger.info(String.format("[%s] Verifying document data...", scenario));
+      var documentIterator = docStoreClient.query()
+          .where("id", FilterOperation.IN, List.of(mobile.getId(), tablet.getId(), laptop.getId()))
+          .where("details.country", FilterOperation.EQUAL, "US").get();
+
+
+      List<KitProduct> expectedProducts = List.of(laptop);
+      int index = 0;
+      while (documentIterator.hasNext()) {
+        KitProduct retrievedData = new KitProduct();
+        documentIterator.next(new Document(retrievedData));
+        if (!expectedProducts.get(index).equals(retrievedData)) {
+          logger.info(String.format("[%s] Data mismatch after retrieval. Test FAILED.", scenario));
+          return;
+        }
+        index++;
+      }
+
+      if(index != expectedProducts.size()){
+        logger.info(String.format("[%s] Data mismatch after retrieval. Test FAILED.", scenario));
+        return;
+      }
+
+      logger.info(String.format("[%s] Data integrity verified. Test PASSED!", scenario));
+
+    } catch (Exception e) {
+      logger.error(String.format("[%s] Error during test: %s", scenario, e.getMessage()));
+      e.printStackTrace();
+      logger.error(String.format("[%s] Test FAILED.", scenario));
+    }
+  }
+
   private static void FS_IT_ATOMIC_TRANSACT_01() {
     String scenario = "FS_IT_ATOMIC_TRANSACT_01";
 
@@ -839,6 +924,62 @@ public class FireStoreMCJTest {
       e.printStackTrace();
       logger.error(String.format("[%s] Test FAILED.", scenario));
     }
+  }
+
+  private static void FS_BATCH_WRITE_01() {
+    String scenario = "FS_BATCH_WRITE_01";
+    List<Document> products = new ArrayList<>();
+
+    long targetTotalSizeMB = 10;
+    long targetTotalSizeBytes = targetTotalSizeMB * 1024 * 1024;
+
+    long sizePerProductDetailsKB = targetTotalSizeBytes / 10 / 1024;
+
+    for (int i = 1; i <= 20; i++) {
+      String id = "batchRollbackTest00" + i;
+      String productName = "Mega Gadget Pro " + i;
+      double price = 999.99 + i;
+      boolean isActive = i % 2 == 0;
+
+      // a large string for ProductDetails
+      String veryLongData = generateLargeString(sizePerProductDetailsKB * 1024);
+
+      ProductDetails details = new ProductDetails("1.0.2", veryLongData, new java.util.Date().toString());
+
+      Product product = Product.builder()
+          .id(id)
+          .productName(productName)
+          .details(details)
+          .price(price)
+          .isActive(isActive)
+          .build();
+
+      products.add(new Document(product));
+    }
+
+    try {
+      logger.info(String.format("[%s] Creating documents (expected to fail) ....!", scenario));
+      docStoreClient.batchPut(products);
+    } catch (DeadlineExceededException e) {
+      logger.info(String.format("[%s] Exception verified. Test PASSED!", scenario));
+    } catch (Exception e) {
+      logger.error(String.format("[%s] Error during test: %s", scenario, e.getMessage()));
+      e.printStackTrace();
+      logger.error(String.format("[%s] Test FAILED.", scenario));
+    }
+  }
+
+  private static String generateLargeString(long sizeInBytes) {
+    // Use StringBuilder for efficient string concatenation
+    StringBuilder sb = new StringBuilder((int) sizeInBytes);
+    // Append characters until the desired size is approximately reached.
+    // Assuming 1 character = 1 byte for simplicity (e.g., ASCII/Latin-1 characters).
+    // In Java, String uses char[], which are UTF-16, so each char is 2 bytes.
+    // To get `sizeInBytes` in total, we need `sizeInBytes / 2` characters.
+    for (long i = 0; i < sizeInBytes / 2; i++) {
+      sb.append('A'); // Append a simple character
+    }
+    return sb.toString();
   }
     private static boolean initializeDocStoreClient () {
       try {

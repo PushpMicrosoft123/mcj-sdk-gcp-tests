@@ -3,11 +3,14 @@ package sf.mcj.main.TestData;
 import java.util.Objects;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.experimental.SuperBuilder;
 
 @AllArgsConstructor
 @NoArgsConstructor
-@Builder
+@SuperBuilder
+@Getter
 public class ProductDetails {
 
   public String version;
