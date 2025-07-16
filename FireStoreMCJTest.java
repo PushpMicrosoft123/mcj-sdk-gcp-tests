@@ -25,7 +25,6 @@ import sf.mcj.main.TestData.Matrix;
 import sf.mcj.main.TestData.Product;
 import sf.mcj.main.TestData.ProductDetails;
 import sf.mcj.main.TestData.SuperProduct;
-import sf.mcj.tests.firestore.FireStoreGCPNativeTest;
 
 public class FireStoreMCJTest {
 
@@ -42,7 +41,7 @@ public class FireStoreMCJTest {
 
     logger.info("---- Running Firestore Tests-----");
 
-    /*FS_IT_CREATE_01();
+    FS_IT_CREATE_01();
 
     FS_IT_CREATE_02();
 
@@ -60,6 +59,8 @@ public class FireStoreMCJTest {
 
     FS_IT_GET_03();
 
+    FS_IT_GET_04();
+
     FS_IT_PUT_01();
 
     FS_IT_PUT_02();
@@ -74,14 +75,9 @@ public class FireStoreMCJTest {
 
     FS_IT_QUERY_04();
 
-    FS_IT_QUERY_06();*/
+    FS_IT_QUERY_06();
 
-    //FS_IT_QUERY_07();
-
-    //FS_BATCH_WRITE_01();
-    //FireStoreGCPNativeTest.FS_GET_04();
-
-    FS_IT_GET_04();
+    FS_IT_QUERY_07();
 
     FS_IT_ATOMIC_TRANSACT_01();
 
@@ -90,6 +86,8 @@ public class FireStoreMCJTest {
     FS_IT_ATOMIC_TRANSACT_03();
 
     FS_IT_ATOMIC_TRANSACT_04();
+
+    FS_BATCH_WRITE_01();
 
     closeConnection();
   }
