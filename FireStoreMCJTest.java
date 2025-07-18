@@ -2,10 +2,13 @@ package sf.mcj.main;
 
 import com.salesforce.multicloudj.common.exceptions.DeadlineExceededException;
 import com.salesforce.multicloudj.common.exceptions.InvalidArgumentException;
+import com.salesforce.multicloudj.common.exceptions.ResourceAlreadyExistsException;
 import com.salesforce.multicloudj.common.exceptions.SubstrateSdkException;
 import com.salesforce.multicloudj.docstore.client.DocStoreClient;
 import com.salesforce.multicloudj.docstore.driver.CollectionOptions;
 import com.salesforce.multicloudj.docstore.driver.Document;
+import com.salesforce.multicloudj.docstore.driver.DocumentIterator;
+import com.salesforce.multicloudj.docstore.driver.Filter;
 import com.salesforce.multicloudj.docstore.driver.FilterOperation;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -53,6 +56,8 @@ public class FireStoreMCJTest {
 
     FS_IT_CREATE_06();
 
+    FS_IT_CREATE_07();
+
     FS_IT_GET_01();
 
     FS_IT_GET_02();
@@ -88,6 +93,8 @@ public class FireStoreMCJTest {
     FS_IT_ATOMIC_TRANSACT_04();
 
     FS_BATCH_WRITE_01();
+
+    FS_DELETE_COLLECTION_01();
 
     closeConnection();
   }
@@ -249,6 +256,27 @@ public class FireStoreMCJTest {
       docStoreClient.create(new Document(testData));
     }
     catch (InvalidArgumentException ex) {
+      logger.info(String.format("[%s] Exception verified. Test PASSED!", scenario));
+    }
+    catch (Exception e) {
+      logger.error(String.format("[%s] Error during test: %s", scenario, e.getMessage()));
+      e.printStackTrace();
+      logger.error(String.format("[%s] Test FAILED.", scenario));
+    }
+  }
+
+  private static void FS_IT_CREATE_07() {
+    String scenario = "FS_IT_CREATE_07";
+
+    ProductDetails details = new ProductDetails("1.0.2", "Acme Corp", new java.util.Date().toString());
+    Product testData01 = new Product("createCompDuplicateId01", "Deluxe Widget", details, 29.99, true);
+    Product testData02 = new Product("createCompDuplicateId01", "Deluxe Widget", details, 29.99, true);
+
+    try {
+      logger.info(String.format("[%s] Creating documents (expected to fail) ...", scenario));
+      docStoreClient.create(new Document(testData01));
+      docStoreClient.create(new Document(testData02));
+    } catch (ResourceAlreadyExistsException ex) {
       logger.info(String.format("[%s] Exception verified. Test PASSED!", scenario));
     }
     catch (Exception e) {
@@ -960,6 +988,47 @@ public class FireStoreMCJTest {
       docStoreClient.batchPut(products);
     } catch (DeadlineExceededException e) {
       logger.info(String.format("[%s] Exception verified. Test PASSED!", scenario));
+    } catch (Exception e) {
+      logger.error(String.format("[%s] Error during test: %s", scenario, e.getMessage()));
+      e.printStackTrace();
+      logger.error(String.format("[%s] Test FAILED.", scenario));
+    }
+  }
+
+  private static void FS_DELETE_COLLECTION_01() {
+    String scenario = "FS_DELETE_COLLECTION_01";
+    ProductDetails details = new ProductDetails("1.0.2", "Acme Corp", new java.util.Date().toString());
+    Product testData01 = new Product("deleteCollection01", "Deluxe Widget", details, 29.99, true);
+
+    Product testData02 = new Product("deleteCollection02", "Deluxe Widget", details, 29.99, true);
+
+    try {
+      logger.info(String.format("[%s] Creating documents ....!", scenario));
+      docStoreClient.create(new Document(testData01));
+      docStoreClient.create(new Document(testData02));
+
+      DocumentIterator documentIterator = docStoreClient.query().where("price", FilterOperation.NOT_IN, List.of(" ")).get();
+
+      var actionList = docStoreClient.getActions();
+
+      while (documentIterator.hasNext()) {
+        Product retrievedData = new Product();
+        documentIterator.next(new Document(retrievedData));
+        actionList.delete(new Document(retrievedData));
+      }
+
+      actionList.run();
+      DocumentIterator documentIterator01 = docStoreClient.query().where("id", FilterOperation.NOT_IN, List.of(" ")).get();
+
+      int remainingDocs = 0;
+      while (documentIterator01.hasNext()) {
+        remainingDocs++;
+      }
+
+      if(remainingDocs == 0) {
+        logger.info(String.format("[%s] Data integrity verified. Test PASSED!", scenario));
+      }
+
     } catch (Exception e) {
       logger.error(String.format("[%s] Error during test: %s", scenario, e.getMessage()));
       e.printStackTrace();
