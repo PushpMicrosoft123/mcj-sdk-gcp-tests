@@ -94,7 +94,7 @@ public class FireStoreMCJTest {
 
     FS_BATCH_WRITE_01();
 
-    FS_DELETE_COLLECTION_01();
+    FS_DELETE_02();
 
     closeConnection();
   }
@@ -995,7 +995,7 @@ public class FireStoreMCJTest {
     }
   }
 
-  private static void FS_DELETE_COLLECTION_01() {
+  private static void FS_DELETE_02() {
     String scenario = "FS_DELETE_COLLECTION_01";
     ProductDetails details = new ProductDetails("1.0.2", "Acme Corp", new java.util.Date().toString());
     Product testData01 = new Product("deleteCollection01", "Deluxe Widget", details, 29.99, true);
