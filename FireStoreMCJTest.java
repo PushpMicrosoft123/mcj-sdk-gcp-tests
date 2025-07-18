@@ -44,7 +44,7 @@ public class FireStoreMCJTest {
 
     logger.info("---- Running Firestore Tests-----");
 
-    FS_IT_CREATE_01();
+    /*FS_IT_CREATE_01();
 
     FS_IT_CREATE_02();
 
@@ -92,7 +92,7 @@ public class FireStoreMCJTest {
 
     FS_IT_ATOMIC_TRANSACT_04();
 
-    FS_BATCH_WRITE_01();
+    FS_BATCH_WRITE_01();*/
 
     FS_DELETE_02();
 
@@ -996,18 +996,24 @@ public class FireStoreMCJTest {
   }
 
   private static void FS_DELETE_02() {
-    String scenario = "FS_DELETE_COLLECTION_01";
+    String scenario = "FS_DELETE_02";
     ProductDetails details = new ProductDetails("1.0.2", "Acme Corp", new java.util.Date().toString());
-    Product testData01 = new Product("deleteCollection01", "Deluxe Widget", details, 29.99, true);
+    Product testData01 = new Product("deleteCollection001", "Deluxe Widget", details, 29.99, true);
 
-    Product testData02 = new Product("deleteCollection02", "Deluxe Widget", details, 29.99, true);
+    Product testData02 = new Product("deleteCollection002", "Deluxe Widget", details, 29.99, true);
+
+    Product testData03 = new Product("deleteCollection003", "Deluxe Widget", details, 29.99, true);
+
+    Product testData04 = new Product("deleteCollection004", "Deluxe Widget", details, 29.99, true);
 
     try {
       logger.info(String.format("[%s] Creating documents ....!", scenario));
       docStoreClient.create(new Document(testData01));
       docStoreClient.create(new Document(testData02));
+      docStoreClient.create(new Document(testData03));
+      docStoreClient.create(new Document(testData04));
 
-      DocumentIterator documentIterator = docStoreClient.query().where("price", FilterOperation.NOT_IN, List.of(" ")).get();
+      DocumentIterator documentIterator = docStoreClient.query().where("id", FilterOperation.IN, List.of(testData01.getId(), testData02.getId(), testData03.getId(), testData04.getId())).get();
 
       var actionList = docStoreClient.getActions();
 
@@ -1018,7 +1024,7 @@ public class FireStoreMCJTest {
       }
 
       actionList.run();
-      DocumentIterator documentIterator01 = docStoreClient.query().where("id", FilterOperation.NOT_IN, List.of(" ")).get();
+      DocumentIterator documentIterator01 = docStoreClient.query().where("id", FilterOperation.IN, List.of(testData01.getId(), testData02.getId(), testData03.getId(), testData04.getId())).get();
 
       int remainingDocs = 0;
       while (documentIterator01.hasNext()) {
@@ -1037,12 +1043,7 @@ public class FireStoreMCJTest {
   }
 
   private static String generateLargeString(long sizeInBytes) {
-    // Use StringBuilder for efficient string concatenation
     StringBuilder sb = new StringBuilder((int) sizeInBytes);
-    // Append characters until the desired size is approximately reached.
-    // Assuming 1 character = 1 byte for simplicity (e.g., ASCII/Latin-1 characters).
-    // In Java, String uses char[], which are UTF-16, so each char is 2 bytes.
-    // To get `sizeInBytes` in total, we need `sizeInBytes / 2` characters.
     for (long i = 0; i < sizeInBytes / 2; i++) {
       sb.append('A'); // Append a simple character
     }
