@@ -44,7 +44,7 @@ public class FireStoreMCJTest {
 
     logger.info("---- Running Firestore Tests-----");
 
-    /*FS_IT_CREATE_01();
+    FS_IT_CREATE_01();
 
     FS_IT_CREATE_02();
 
@@ -92,7 +92,7 @@ public class FireStoreMCJTest {
 
     FS_IT_ATOMIC_TRANSACT_04();
 
-    FS_BATCH_WRITE_01();*/
+    FS_BATCH_WRITE_01();
 
     FS_DELETE_02();
 
