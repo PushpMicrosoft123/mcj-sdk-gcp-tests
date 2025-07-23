@@ -44,61 +44,59 @@ public class FireStoreMCJTest {
 
     logger.info("---- Running Firestore Tests-----");
 
-    BlobStoreMCJTest.main(new String[]{});
+    FS_IT_CREATE_01();
 
-    // FS_IT_CREATE_01();
-    //
-    // FS_IT_CREATE_02();
-    //
-    // FS_IT_CREATE_03();
-    //
-    // FS_IT_CREATE_04();
-    //
-    // FS_IT_CREATE_05();
-    //
-    // FS_IT_CREATE_06();
-    //
-    // FS_IT_CREATE_07();
-    //
-    // FS_IT_GET_01();
-    //
-    // FS_IT_GET_02();
-    //
-    // FS_IT_GET_03();
-    //
-    // FS_IT_GET_04();
-    //
-    // FS_IT_PUT_01();
-    //
-    // FS_IT_PUT_02();
-    //
-    // FS_IT_PUT_03();
-    //
-    // FS_IT_QUERY_01();
-    //
-    // FS_IT_QUERY_02();
-    //
-    // FS_IT_QUERY_03();
-    //
-    // FS_IT_QUERY_04();
-    //
-    // FS_IT_QUERY_06();
-    //
-    // FS_IT_QUERY_07();
-    //
-    // FS_IT_ATOMIC_TRANSACT_01();
-    //
-    // FS_IT_ATOMIC_TRANSACT_02();
-    //
-    // FS_IT_ATOMIC_TRANSACT_03();
-    //
-    // FS_IT_ATOMIC_TRANSACT_04();
-    //
-    // FS_BATCH_WRITE_01();
-    //
-    // FS_DELETE_02();
-    //
-    // closeConnection();
+    FS_IT_CREATE_02();
+
+    FS_IT_CREATE_03();
+
+    FS_IT_CREATE_04();
+
+    FS_IT_CREATE_05();
+
+    FS_IT_CREATE_06();
+
+    FS_IT_CREATE_07();
+
+    FS_IT_GET_01();
+
+    FS_IT_GET_02();
+
+    FS_IT_GET_03();
+
+    FS_IT_GET_04();
+
+    FS_IT_PUT_01();
+
+    FS_IT_PUT_02();
+
+    FS_IT_PUT_03();
+
+    FS_IT_QUERY_01();
+
+    FS_IT_QUERY_02();
+
+    FS_IT_QUERY_03();
+
+    FS_IT_QUERY_04();
+
+    FS_IT_QUERY_06();
+
+    FS_IT_QUERY_07();
+
+    FS_IT_ATOMIC_TRANSACT_01();
+
+    FS_IT_ATOMIC_TRANSACT_02();
+
+    FS_IT_ATOMIC_TRANSACT_03();
+
+    FS_IT_ATOMIC_TRANSACT_04();
+
+    FS_BATCH_WRITE_01();
+
+    FS_DELETE_02();
+
+    closeConnection();
   }
 
   private static void FS_IT_CREATE_01() {
