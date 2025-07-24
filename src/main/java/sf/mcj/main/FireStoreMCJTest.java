@@ -8,7 +8,6 @@ import com.salesforce.multicloudj.docstore.client.DocStoreClient;
 import com.salesforce.multicloudj.docstore.driver.CollectionOptions;
 import com.salesforce.multicloudj.docstore.driver.Document;
 import com.salesforce.multicloudj.docstore.driver.DocumentIterator;
-import com.salesforce.multicloudj.docstore.driver.Filter;
 import com.salesforce.multicloudj.docstore.driver.FilterOperation;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -19,7 +18,6 @@ import java.util.Objects;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import sf.mcj.clients.FireStoreMCJClient;
 import sf.mcj.main.TestData.CompositeProduct;
 import sf.mcj.main.TestData.Item;
 import sf.mcj.main.TestData.KitProduct;
@@ -33,7 +31,7 @@ public class FireStoreMCJTest {
 
   private static DocStoreClient docStoreClient;
 
-  private static final Logger logger = LoggerFactory.getLogger(FireStoreMCJClient.class);
+  private static final Logger logger = LoggerFactory.getLogger(FireStoreMCJTest.class);
 
   public static void main(String[] args) {
     //****** Please recreate the collection Products before running the test cases*****
