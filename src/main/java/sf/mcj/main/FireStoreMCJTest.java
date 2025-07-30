@@ -111,12 +111,12 @@ public class FireStoreMCJTest {
       Product retrievedData = Product.builder().id(testData.getId()).build();
       docStoreClient.get(new Document(retrievedData));
 
-        // Basic verification
-        if (testData.equals(retrievedData)) {
-          logger.info(String.format("[%s] Data integrity verified. Test PASSED!", scenario));
-        } else {
-          logger.info(String.format("[%s] Data mismatch after retrieval. Test FAILED.", scenario));
-        }
+      // Basic verification
+      if (testData.equals(retrievedData)) {
+        logger.info(String.format("[%s] Data integrity verified. Test PASSED!", scenario));
+      } else {
+        logger.info(String.format("[%s] Data mismatch after retrieval. Test FAILED.", scenario));
+      }
     } catch (Exception e) {
       logger.error(String.format("[%s] Error during test: %s", scenario, e.getMessage()));
       e.printStackTrace();
@@ -149,12 +149,12 @@ public class FireStoreMCJTest {
       docStoreClient.get(new Document(retrievedData));
       logger.info(String.format("[%s] Verifying document data...", scenario));
 
-        // Basic verification
-        if (testData.equals(retrievedData)) {
-          logger.info(String.format("[%s] Data integrity verified. Test PASSED!", scenario));
-        } else {
-          logger.info(String.format("[%s] Data mismatch after retrieval. Test FAILED", scenario));
-        }
+      // Basic verification
+      if (testData.equals(retrievedData)) {
+        logger.info(String.format("[%s] Data integrity verified. Test PASSED!", scenario));
+      } else {
+        logger.info(String.format("[%s] Data mismatch after retrieval. Test FAILED", scenario));
+      }
     } catch (Exception e) {
       logger.error(String.format("[%s] Error during test: %s", scenario, e.getMessage()));
       e.printStackTrace();
@@ -816,11 +816,12 @@ public class FireStoreMCJTest {
       Product retrievedData01 = Product.builder().id(createTestData01.getId()).build();
       Product retrievedData02 = Product.builder().id(createTestData02.getId()).build();
       docStoreClient.getActions()
+          .enableAtomicWrites()
           .put(new Document(updateTestData01))
           .put(new Document(updateTestData02))
           .get(new Document(retrievedData01))
           .get(new Document(retrievedData02))
-          .enableAtomicWrites().run();
+          .run();
 
       // Basic verification
       if (updateTestData01.equals(retrievedData01) && updateTestData02.equals(retrievedData02)) {
@@ -858,9 +859,10 @@ public class FireStoreMCJTest {
       logger.info(String.format("[%s] Running atomic transaction (expected to be failed)...", scenario));
       Product retrievedData01 = Product.builder().id(testData.getId()).build();
       docStoreClient.getActions()
+          .enableAtomicWrites()
           .put(new Document(updateTestData))
           .get(new Document(retrievedData01))
-          .enableAtomicWrites().run();
+          .run();
 
       // Basic verification
       if (testData.equals(retrievedData01)) {
@@ -923,6 +925,7 @@ public class FireStoreMCJTest {
       Product retrievedData04 = Product.builder().id(createTestData04.getId()).build();
 
       var actions = docStoreClient.getActions()
+          .enableAtomicWrites()
           .get(new Document(retrievedData01))
           .get(new Document(retrievedData02))
           .get(new Document(retrievedData03))
@@ -935,7 +938,7 @@ public class FireStoreMCJTest {
 
       actions.get(new Document(updateRetrievedData01)).get(new Document(updateRetrievedData02));
 
-      actions.enableAtomicWrites().run();
+      actions.run();
 
       // Basic verification
       if (updateTestData01.equals(retrievedData01) && updateTestData02.equals(retrievedData02)) {
@@ -1047,36 +1050,36 @@ public class FireStoreMCJTest {
     }
     return sb.toString();
   }
-    private static boolean initializeDocStoreClient () {
-      try {
-        CollectionOptions collectionOptions = new CollectionOptions.CollectionOptionsBuilder()
-            .withTableName("projects/svc-prj-test-2/databases/sf-mcj-test-fs-db/documents/Products")
-            .withPartitionKey("id")
-            //.withSortKey("publisher")
-            //.withRevisionField("docRevision")
-            .withAllowScans(true)
-            .build();
+  private static boolean initializeDocStoreClient () {
+    try {
+      CollectionOptions collectionOptions = new CollectionOptions.CollectionOptionsBuilder()
+          .withTableName("projects/svc-prj-test-2/databases/sf-mcj-test-fs-db/documents/Products")
+          .withPartitionKey("id")
+          //.withSortKey("publisher")
+          //.withRevisionField("docRevision")
+          .withAllowScans(true)
+          .build();
 
-        var docStoreClientBuilder = DocStoreClient.builder("gcp-firestore")
-            .withRegion("us-west-2")
-            .withCollectionOptions(collectionOptions);
+      var docStoreClientBuilder = DocStoreClient.builder("gcp-firestore")
+          .withRegion("us-west-2")
+          .withCollectionOptions(collectionOptions);
 
-        docStoreClient = docStoreClientBuilder.build();
-        return true;
-      } catch (SubstrateSdkException sse) {
-        logger.error("FireStore connection failed. SDK caught exception raised with error"
-            + sse.getMessage());
-        return false;
-      } catch (Exception ex) {
-        logger.error("FireStore connection failed. SDK uncaught exception raised with error"
-            + ex.getMessage());
-        return false;
-      }
-    }
-
-    private static void closeConnection () {
-      if (docStoreClient != null) {
-        docStoreClient.close();
-      }
+      docStoreClient = docStoreClientBuilder.build();
+      return true;
+    } catch (SubstrateSdkException sse) {
+      logger.error("FireStore connection failed. SDK caught exception raised with error"
+          + sse.getMessage());
+      return false;
+    } catch (Exception ex) {
+      logger.error("FireStore connection failed. SDK uncaught exception raised with error"
+          + ex.getMessage());
+      return false;
     }
   }
+
+  private static void closeConnection () {
+    if (docStoreClient != null) {
+      docStoreClient.close();
+    }
+  }
+}
