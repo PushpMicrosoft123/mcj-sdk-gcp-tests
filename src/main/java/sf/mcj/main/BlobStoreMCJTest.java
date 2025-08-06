@@ -3,9 +3,14 @@ package sf.mcj.main;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.salesforce.multicloudj.blob.client.BucketClient;
 import com.salesforce.multicloudj.blob.driver.BlobIdentifier;
+import com.salesforce.multicloudj.blob.driver.BlobInfo;
+import com.salesforce.multicloudj.blob.driver.BlobMetadata;
 import com.salesforce.multicloudj.blob.driver.ByteArray;
 import com.salesforce.multicloudj.blob.driver.CopyRequest;
 import com.salesforce.multicloudj.blob.driver.DownloadRequest;
+import com.salesforce.multicloudj.blob.driver.ListBlobsRequest;
+import com.salesforce.multicloudj.blob.driver.PresignedOperation;
+import com.salesforce.multicloudj.blob.driver.PresignedUrlRequest;
 import com.salesforce.multicloudj.blob.driver.UploadRequest;
 import com.salesforce.multicloudj.blob.driver.UploadResponse;
 import com.salesforce.multicloudj.common.exceptions.InvalidArgumentException;
@@ -17,15 +22,19 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -108,6 +117,15 @@ public class BlobStoreMCJTest {
     GCS_COPY_02();
 
     GCS_COPY_03();
+
+    GCS_METADATA_01();
+
+    GCS_LIST_OBJECTS_01();
+
+    GCS_PRESIGNED_URL_01();
+
+    GCS_PRESIGNED_URL_02();
+
   }
 
   public static void GCS_UPLOAD_01() {
@@ -967,6 +985,146 @@ public class BlobStoreMCJTest {
       logger.error(String.format("[%s] Test FAILED.", scenario));
     }
   }
+
+  public static void GCS_METADATA_01() {
+    String scenario = "GCS_METADATA_01";
+    String objectName = String.format("%s.txt", UUID.randomUUID());
+
+    try {
+      UploadRequest uploadRequest = new UploadRequest.Builder()
+          .withKey(objectName)
+          .withMetadata(Map.of(scenario, String.format("%s_VAL", scenario)))
+          .build();
+
+      logger.info(String.format("[%s] Uploading content to non-existing object(file)", scenario));
+      UploadResponse response = bucketClient.upload(uploadRequest, "Hello World!".getBytes());
+
+      logger.info(String.format("[%s] getting metadata", scenario));
+
+      BlobMetadata blobMetadata = bucketClient.getMetadata(objectName, null);
+
+      if(blobMetadata.getMetadata().get(scenario).toString().equals(String.format("%s_VAL", scenario))) {
+        logger.info(String.format("[%s] Test PASSED!", scenario));
+      }
+      else {
+        logger.error(String.format("[%s] Test FAILED.", scenario));
+      }
+    } catch (Exception e) {
+      logger.error(String.format("[%s] Error during test: %s", scenario, e.getMessage()));
+      e.printStackTrace();
+      logger.error(String.format("[%s] Test FAILED.", scenario));
+    }
+  }
+
+  public static void GCS_LIST_OBJECTS_01() {
+    String scenario = "GCS_LIST_OBJECTS_01";
+    String sourceObject01 = String.format("%s.txt", UUID.randomUUID());
+    String sourceObject02 = String.format("%s.txt", UUID.randomUUID());
+    String sourceKey01 = String.format("%s/%s", scenario, sourceObject01);
+    String sourceKey02 = String.format("%s/%s", scenario, sourceObject02);
+
+    try {
+      UploadRequest uploadRequest01 = new UploadRequest.Builder()
+          .withKey(sourceKey01)
+          .withMetadata(Map.of(scenario, String.format("%s_VAL", scenario)))
+          .build();
+
+      UploadRequest uploadRequest02 = new UploadRequest.Builder()
+          .withKey(sourceKey02)
+          .withMetadata(Map.of(scenario, String.format("%s_VAL", scenario)))
+          .build();
+
+      logger.info(String.format("[%s] Uploading content to non-existing object(file)", scenario));
+      UploadResponse response01 = bucketClient.upload(uploadRequest01, "Hello World!".getBytes());
+      UploadResponse response02 = bucketClient.upload(uploadRequest02, generateLargeString(10).getBytes());
+
+      logger.info(String.format("[%s] listing objects..", scenario));
+
+      ListBlobsRequest request = new ListBlobsRequest.Builder()
+          .withPrefix(String.format("%s/", scenario))
+          .build();
+
+      Iterator<BlobInfo> blobInfoIterator = bucketClient.list(request);
+
+      Set<String> expectedObjects = Set.of(sourceKey02, sourceKey01);
+
+      while (blobInfoIterator.hasNext()) {
+        BlobInfo blobInfo = blobInfoIterator.next();
+        if(!expectedObjects.contains(blobInfo.getKey())) {
+          logger.error(String.format("[%s] Test FAILED.", scenario));
+        }
+      }
+
+      logger.info(String.format("[%s] Test PASSED.", scenario));
+    } catch (Exception e) {
+      logger.error(String.format("[%s] Error during test: %s", scenario, e.getMessage()));
+      e.printStackTrace();
+      logger.error(String.format("[%s] Test FAILED.", scenario));
+    }
+  }
+
+  public static void GCS_PRESIGNED_URL_01() {
+    String scenario = "GCS_LIST_OBJECTS_01";
+    String sourceObject01 = String.format("%s.txt", UUID.randomUUID());
+    String sourceKey01 = String.format("%s/%s", scenario, sourceObject01);
+
+    try {
+      UploadRequest uploadRequest01 = new UploadRequest.Builder()
+          .withKey(sourceKey01)
+          .withMetadata(Map.of(scenario, String.format("%s_VAL", scenario)))
+          .build();
+
+      logger.info(String.format("[%s] Uploading content to non-existing object(file)", scenario));
+      UploadResponse response01 = bucketClient.upload(uploadRequest01, "Hello World!".getBytes());
+
+      logger.info(String.format("[%s] generating presigned url..", scenario));
+
+      PresignedUrlRequest requestBuilder = PresignedUrlRequest.builder()
+          .key(sourceKey01)
+          .type(PresignedOperation.DOWNLOAD)
+          .metadata(Map.of("key1", "val1"))
+          .duration(Duration.ofMinutes(1))
+          .build();
+      URL presignedUrl = bucketClient.generatePresignedUrl(requestBuilder);
+      logger.info(String.format("[%s] Test PASSED.", scenario));
+    } catch (Exception e) {
+      logger.error(String.format("[%s] Error during test: %s", scenario, e.getMessage()));
+      e.printStackTrace();
+      logger.error(String.format("[%s] Test FAILED.", scenario));
+    }
+  }
+
+  public static void GCS_PRESIGNED_URL_02() {
+    String scenario = "GCS_LIST_OBJECTS_01";
+    String sourceObject01 = String.format("%s.txt", UUID.randomUUID());
+    String sourceKey01 = String.format("%s/%s", scenario, sourceObject01);
+
+    try {
+      UploadRequest uploadRequest01 = new UploadRequest.Builder()
+          .withKey(sourceKey01)
+          .withMetadata(Map.of(scenario, String.format("%s_VAL", scenario)))
+          .build();
+
+      logger.info(String.format("[%s] Uploading content to non-existing object(file)", scenario));
+      UploadResponse response01 = bucketClient.upload(uploadRequest01, "Hello World!".getBytes());
+
+      logger.info(String.format("[%s] generating presigned url..", scenario));
+
+      PresignedUrlRequest requestBuilder = PresignedUrlRequest.builder()
+          .key(sourceKey01)
+          .type(PresignedOperation.UPLOAD)
+          .metadata(Map.of("key1", "val1"))
+          .duration(Duration.ofMinutes(1))
+          .build();
+      URL presignedUrl = bucketClient.generatePresignedUrl(requestBuilder);
+      logger.info(String.format("[%s] Test PASSED.", scenario));
+    } catch (Exception e) {
+      logger.error(String.format("[%s] Error during test: %s", scenario, e.getMessage()));
+      e.printStackTrace();
+      logger.error(String.format("[%s] Test FAILED.", scenario));
+    }
+  }
+
   private static void generateTestFile(String filename, long sizeMB) throws IOException {
     Path filePath = Paths.get(filename);
     byte[] buffer = new byte[1024 * 1024];
