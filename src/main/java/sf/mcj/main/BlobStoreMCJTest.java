@@ -1064,7 +1064,7 @@ public class BlobStoreMCJTest {
   }
 
   public static void GCS_PRESIGNED_URL_01() {
-    String scenario = "GCS_LIST_OBJECTS_01";
+    String scenario = "GCS_PRESIGNED_URL_01";
     String sourceObject01 = String.format("%s.txt", UUID.randomUUID());
     String sourceKey01 = String.format("%s/%s", scenario, sourceObject01);
 
@@ -1095,7 +1095,7 @@ public class BlobStoreMCJTest {
   }
 
   public static void GCS_PRESIGNED_URL_02() {
-    String scenario = "GCS_LIST_OBJECTS_01";
+    String scenario = "GCS_PRESIGNED_URL_02";
     String sourceObject01 = String.format("%s.txt", UUID.randomUUID());
     String sourceKey01 = String.format("%s/%s", scenario, sourceObject01);
 
