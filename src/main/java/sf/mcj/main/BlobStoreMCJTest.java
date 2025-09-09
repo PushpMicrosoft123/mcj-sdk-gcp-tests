@@ -8,25 +8,33 @@ import com.salesforce.multicloudj.blob.driver.BlobMetadata;
 import com.salesforce.multicloudj.blob.driver.ByteArray;
 import com.salesforce.multicloudj.blob.driver.CopyRequest;
 import com.salesforce.multicloudj.blob.driver.DownloadRequest;
+import com.salesforce.multicloudj.blob.driver.DownloadResponse;
 import com.salesforce.multicloudj.blob.driver.ListBlobsRequest;
+import com.salesforce.multicloudj.blob.driver.MultipartPart;
+import com.salesforce.multicloudj.blob.driver.MultipartUpload;
+import com.salesforce.multicloudj.blob.driver.MultipartUploadRequest;
 import com.salesforce.multicloudj.blob.driver.PresignedOperation;
 import com.salesforce.multicloudj.blob.driver.PresignedUrlRequest;
+import com.salesforce.multicloudj.blob.driver.UploadPartResponse;
 import com.salesforce.multicloudj.blob.driver.UploadRequest;
 import com.salesforce.multicloudj.blob.driver.UploadResponse;
 import com.salesforce.multicloudj.common.exceptions.InvalidArgumentException;
 import com.salesforce.multicloudj.common.exceptions.SubstrateSdkException;
+import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -50,6 +58,9 @@ public class BlobStoreMCJTest {
   private static BucketClient bucketClient;
 
   private static final Logger logger = LoggerFactory.getLogger(BlobStoreMCJTest.class);
+
+  private static final String CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  private static final SecureRandom RANDOM = new SecureRandom();
 
   public static void main(String[] args) {
     //****** Please recreate the bucket mcj-blob-test before running the test cases*****
@@ -125,6 +136,14 @@ public class BlobStoreMCJTest {
     GCS_PRESIGNED_URL_01();
 
     GCS_PRESIGNED_URL_02();
+
+    GCS_MPU_01();
+
+    GCS_MPU_02();
+
+    GCS_MPU_03();
+
+    GCS_DOWNLOAD_11();
 
   }
 
@@ -772,7 +791,7 @@ public class BlobStoreMCJTest {
           .withVersionId(response1.getVersionId())
           .build();
       Path path = Paths.get(objectName);
-      bucketClient.download(downloadRequest, path);
+      DownloadResponse dr = bucketClient.download(downloadRequest, path);
       String actualContent1 = Files.readString(path);
 
       if(expectedContent1.equals(actualContent1)) {
@@ -788,6 +807,48 @@ public class BlobStoreMCJTest {
     }
   }
 
+  public static void GCS_DOWNLOAD_11() {
+    String scenario = "GCS_DOWNLOAD_11";
+    String objectKey = String.format("%s.txt", scenario);
+    try {
+      UploadRequest uploadRequest = new UploadRequest.Builder()
+          .withKey(objectKey)
+          .withMetadata(Map.of(scenario, String.format("%s_VAL", scenario)))
+          .build();
+
+      logger.info(String.format("[%s] Uploading content to non-existing object(file)", scenario));
+      String content = generateLargeRandomString(10);
+      UploadResponse response = bucketClient.upload(uploadRequest, content.getBytes());
+
+      logger.info(String.format("[%s] Downloading the object using input stream.", scenario));
+      DownloadRequest downloadRequest = new DownloadRequest.Builder()
+          .withKey(objectKey)
+          .build();
+
+      DownloadResponse dr = bucketClient.download(downloadRequest);
+      InputStream inputStream = dr.getInputStream();
+      StringBuilder actualContent = new StringBuilder();
+      try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+        String line;
+
+        while ((line = reader.readLine()) != null) {
+          actualContent.append(line);
+          actualContent.append(System.lineSeparator());
+        }
+
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+
+      if(content.equals(actualContent)) {
+        logger.info(String.format("[%s] Test PASSED.", scenario));
+      }
+    } catch (Exception e) {
+      logger.error(String.format("[%s] Error during test: %s", scenario, e.getMessage()));
+      e.printStackTrace();
+      logger.error(String.format("[%s] Test FAILED.", scenario));
+    }
+  }
   public static void GCS_DELETE_01() {
     String scenario = "GCS_DELETE_01";
     String objectName = String.format("temp/%s",String.format("%s.txt", scenario));
@@ -1125,6 +1186,186 @@ public class BlobStoreMCJTest {
     }
   }
 
+  public static void GCS_MPU_01() {
+    String scenario = "GCS_MPU_01";
+    String sourceObject = String.format("%s.txt", UUID.randomUUID());
+    String objectKey = String.format("%s/%s", scenario, sourceObject);
+
+    try {
+      MultipartUploadRequest multipartUploadRequest = new MultipartUploadRequest.Builder()
+          .withKey(objectKey)
+          .withMetadata(Map.of(scenario, String.format("%s_VAL", scenario)))
+          .build();
+
+      String content01 = generateLargeString(10);
+      String content02 = generateLargeString(10);
+      String content03 = generateLargeString(10);
+      String content04 = generateLargeString(10);
+
+      MultipartUpload multipartUpload = bucketClient.initiateMultipartUpload(multipartUploadRequest);
+      MultipartPart multipartPart01 = new MultipartPart(1, content01.getBytes());
+      MultipartPart multipartPart02 = new MultipartPart(2, content02.getBytes());
+      MultipartPart multipartPart03 = new MultipartPart(3, content03.getBytes());
+      MultipartPart multipartPart04 = new MultipartPart(4, content04.getBytes());
+
+      UploadPartResponse uploadPartResponse01 = bucketClient.uploadMultipartPart(multipartUpload, multipartPart01);
+      UploadPartResponse uploadPartResponse02 = bucketClient.uploadMultipartPart(multipartUpload, multipartPart02);
+      UploadPartResponse uploadPartResponse03 = bucketClient.uploadMultipartPart(multipartUpload, multipartPart03);
+      UploadPartResponse uploadPartResponse04 = bucketClient.uploadMultipartPart(multipartUpload, multipartPart04);
+
+      List<UploadPartResponse> parts = List.of(uploadPartResponse01, uploadPartResponse02, uploadPartResponse03, uploadPartResponse04);
+      logger.info(String.format("[%s] Uploading content to non-existing object(file)", scenario));
+      bucketClient.completeMultipartUpload(multipartUpload, parts);
+      StringBuilder originalContentBld = new StringBuilder();
+      originalContentBld.append(content01).append(content02).append(content03).append(content04);
+      String expectedContent = originalContentBld.toString();
+
+      logger.info(String.format("[%s] Downloading actual content..", scenario));
+      DownloadRequest downloadRequest = new DownloadRequest.Builder()
+          .withKey(objectKey)
+          .build();
+      ByteArray downloadedBytes = new ByteArray();
+      bucketClient.download(downloadRequest,downloadedBytes);
+      byte[] actualBytes = downloadedBytes.getBytes();
+      String actualContent = new String(actualBytes);
+
+      if(expectedContent.equals(actualContent)) {
+        logger.info(String.format("[%s] Test PASSED.", scenario));
+      }
+      else {
+        logger.error(String.format("[%s] Test FAILED.", scenario));
+      }
+    } catch (Exception e) {
+      logger.error(String.format("[%s] Error during test: %s", scenario, e.getMessage()));
+      e.printStackTrace();
+      logger.error(String.format("[%s] Test FAILED.", scenario));
+    }
+  }
+
+  public static void GCS_MPU_02() {
+    String scenario = "GCS_MPU_02";
+    String sourceObject = String.format("%s.txt", UUID.randomUUID());
+    String objectKey = String.format("%s/%s", scenario, sourceObject);
+
+    try {
+      MultipartUploadRequest multipartUploadRequest = new MultipartUploadRequest.Builder()
+          .withKey(objectKey)
+          .withMetadata(Map.of(scenario, String.format("%s_VAL", scenario)))
+          .build();
+
+      String content01 = generateLargeRandomString(10);
+      String content02 = generateLargeRandomString(10);
+      String content03 = generateLargeRandomString(10);
+      String content04 = generateLargeRandomString(10);
+
+      MultipartUpload multipartUpload = bucketClient.initiateMultipartUpload(multipartUploadRequest);
+      MultipartPart multipartPart01 = new MultipartPart(1, content01.getBytes());
+      MultipartPart multipartPart02 = new MultipartPart(2, content02.getBytes());
+      MultipartPart multipartPart03 = new MultipartPart(3, content03.getBytes());
+      MultipartPart multipartPart04 = new MultipartPart(4, content04.getBytes());
+
+      UploadPartResponse uploadPartResponse01 = bucketClient.uploadMultipartPart(multipartUpload, multipartPart01);
+      UploadPartResponse uploadPartResponse02 = bucketClient.uploadMultipartPart(multipartUpload, multipartPart02);
+      UploadPartResponse uploadPartResponse03 = bucketClient.uploadMultipartPart(multipartUpload, multipartPart03);
+      UploadPartResponse uploadPartResponse04 = bucketClient.uploadMultipartPart(multipartUpload, multipartPart04);
+
+      List<UploadPartResponse> parts = List.of(uploadPartResponse01, uploadPartResponse02, uploadPartResponse03, uploadPartResponse04);
+      logger.info(String.format("[%s] Uploading content to non-existing object(file)", scenario));
+      bucketClient.completeMultipartUpload(multipartUpload, parts);
+
+      //repeat upload to replace content with new content
+      String newContent01 = generateLargeRandomString(10);
+      String newContent02 = generateLargeRandomString(10);
+      String newContent03 = generateLargeRandomString(10);
+      String newContent04 = generateLargeRandomString(10);
+
+      MultipartUpload newMultipartUpload = bucketClient.initiateMultipartUpload(multipartUploadRequest);
+      MultipartPart newMultipartPart01 = new MultipartPart(1, newContent01.getBytes());
+      MultipartPart newMultipartPart02 = new MultipartPart(2, newContent02.getBytes());
+      MultipartPart newMultipartPart03 = new MultipartPart(3, newContent03.getBytes());
+      MultipartPart newMultipartPart04 = new MultipartPart(4, newContent04.getBytes());
+
+      UploadPartResponse newUploadPartResponse01 = bucketClient.uploadMultipartPart(newMultipartUpload, newMultipartPart01);
+      UploadPartResponse newUploadPartResponse02 = bucketClient.uploadMultipartPart(newMultipartUpload, newMultipartPart02);
+      UploadPartResponse newUploadPartResponse03 = bucketClient.uploadMultipartPart(newMultipartUpload, newMultipartPart03);
+      UploadPartResponse newUploadPartResponse04 = bucketClient.uploadMultipartPart(newMultipartUpload, newMultipartPart04);
+
+      List<UploadPartResponse> newParts = List.of(newUploadPartResponse01, newUploadPartResponse02, newUploadPartResponse03, newUploadPartResponse04);
+      logger.info(String.format("[%s] Uploading content to existing object(file)", scenario));
+      bucketClient.completeMultipartUpload(newMultipartUpload, newParts);
+
+      StringBuilder newContentBld = new StringBuilder();
+      newContentBld.append(newContent01).append(newContent02).append(newContent03).append(newContent04);
+      String expectedContent = newContentBld.toString();
+
+      logger.info(String.format("[%s] Downloading actual content..", scenario));
+      DownloadRequest downloadRequest = new DownloadRequest.Builder()
+          .withKey(objectKey)
+          .build();
+      ByteArray downloadedBytes = new ByteArray();
+      bucketClient.download(downloadRequest,downloadedBytes);
+      byte[] actualBytes = downloadedBytes.getBytes();
+      String actualContent = new String(actualBytes);
+
+      if(expectedContent.equals(actualContent)) {
+        logger.info(String.format("[%s] Test PASSED.", scenario));
+      }
+      else {
+        logger.error(String.format("[%s] Test FAILED.", scenario));
+      }
+    } catch (Exception e) {
+      logger.error(String.format("[%s] Error during test: %s", scenario, e.getMessage()));
+      e.printStackTrace();
+      logger.error(String.format("[%s] Test FAILED.", scenario));
+    }
+  }
+
+  public static void GCS_MPU_03() {
+    String scenario = "GCS_MPU_03";
+    String sourceObject = String.format("%s.txt", UUID.randomUUID());
+    String objectKey = String.format("%s/%s", scenario, sourceObject);
+
+    try {
+      MultipartUploadRequest multipartUploadRequest = new MultipartUploadRequest.Builder()
+          .withKey(objectKey)
+          .withMetadata(Map.of(scenario, String.format("%s_VAL", scenario)))
+          .build();
+
+      String content01 = generateLargeString(10);
+      String content02 = generateLargeString(10);
+      String content03 = generateLargeString(10);
+      String content04 = generateLargeString(10);
+
+      MultipartUpload multipartUpload = bucketClient.initiateMultipartUpload(multipartUploadRequest);
+      MultipartPart multipartPart01 = new MultipartPart(1, content01.getBytes());
+      MultipartPart multipartPart02 = new MultipartPart(2, content02.getBytes());
+      MultipartPart multipartPart03 = new MultipartPart(3, content03.getBytes());
+      MultipartPart multipartPart04 = new MultipartPart(4, content04.getBytes());
+
+      UploadPartResponse uploadPartResponse01 = bucketClient.uploadMultipartPart(multipartUpload, multipartPart01);
+      UploadPartResponse uploadPartResponse02 = bucketClient.uploadMultipartPart(multipartUpload, multipartPart02);
+      UploadPartResponse uploadPartResponse03 = bucketClient.uploadMultipartPart(multipartUpload, multipartPart03);
+      UploadPartResponse uploadPartResponse04 = bucketClient.uploadMultipartPart(multipartUpload, multipartPart04);
+
+      List<UploadPartResponse> parts = List.of(uploadPartResponse01, uploadPartResponse02, uploadPartResponse03, uploadPartResponse04);
+      logger.info(String.format("[%s] Aborting upload...", scenario));
+
+      bucketClient.abortMultipartUpload(multipartUpload);
+
+      logger.info(String.format("[%s] Downloading actual content..", scenario));
+      DownloadRequest downloadRequest = new DownloadRequest.Builder()
+          .withKey(objectKey)
+          .build();
+      ByteArray downloadedBytes = new ByteArray();
+      bucketClient.download(downloadRequest,downloadedBytes);
+      logger.error(String.format("[%s] Test FAILED.", scenario));
+    } catch (SubstrateSdkException e) {
+      logger.error(String.format("[%s] Error during test: %s", scenario, e.getMessage()));
+      e.printStackTrace();
+      logger.info(String.format("[%s] Exception verified. Test PASSED.", scenario));
+    }
+  }
+
   private static void generateTestFile(String filename, long sizeMB) throws IOException {
     Path filePath = Paths.get(filename);
     byte[] buffer = new byte[1024 * 1024];
@@ -1146,6 +1387,22 @@ public class BlobStoreMCJTest {
 
     for (long i = 0; i < targetBytes; i++) {
       sb.append(charToRepeat);
+    }
+
+    return sb.toString();
+  }
+
+  public static String generateLargeRandomString(int sizeInMB) {
+    // Convert MB to characters. 1 MB = 1,024 * 1,024 bytes. Assuming 1 character = 1 byte (for ASCII).
+    long sizeInBytes = (long) sizeInMB * 1024 * 1024;
+
+    // Use a StringBuilder for efficient string concatenation
+    StringBuilder sb = new StringBuilder();
+
+    // Generate and append random characters until the desired size is reached
+    for (long i = 0; i < sizeInBytes; i++) {
+      int randomIndex = RANDOM.nextInt(CHARACTERS.length());
+      sb.append(CHARACTERS.charAt(randomIndex));
     }
 
     return sb.toString();

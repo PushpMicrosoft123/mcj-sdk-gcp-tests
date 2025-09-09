@@ -46,12 +46,12 @@
     <dependency>
       <groupId>com.salesforce.multicloudj</groupId>
       <artifactId>blob-client</artifactId>
-      <version>0.2.2</version>
+      <version>0.2.3</version>
     </dependency>
     <dependency>
       <groupId>com.salesforce.multicloudj</groupId>
       <artifactId>blob-gcp</artifactId>
-      <version>0.2.2</version>
+      <version>0.2.3</version>
     </dependency>
     <dependency>
       <groupId>com.salesforce.multicloudj</groupId>
