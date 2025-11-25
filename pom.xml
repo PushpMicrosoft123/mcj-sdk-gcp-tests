@@ -60,8 +60,18 @@
     </dependency>
     <dependency>
       <groupId>com.salesforce.multicloudj</groupId>
+      <artifactId>pubsub-client</artifactId>
+      <version>0.2.15</version>
+    </dependency>
+    <dependency>
+      <groupId>com.salesforce.multicloudj</groupId>
+      <artifactId>pubsub-gcp</artifactId>
+      <version>0.2.15</version>
+    </dependency>
+    <dependency>
+      <groupId>com.salesforce.multicloudj</groupId>
       <artifactId>multicloudj-common</artifactId>
-      <version>0.2.0</version>
+      <version>0.2.15</version>
     </dependency>
     <dependency>
       <groupId>com.salesforce.multicloudj</groupId>
